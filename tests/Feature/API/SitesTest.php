@@ -45,12 +45,18 @@ class SitesTest extends TestCase
 
         Sanctum::actingAs($this->user, ['read', 'write']);
 
-        Database::factory()->create([
-            'server_id' => $this->server->id,
-        ]);
-        DatabaseUser::factory()->create([
-            'server_id' => $this->server->id,
-        ]);
+        if (isset($inputs['database']) && isset($inputs['database_user'])) {
+            /** @var Database $database */
+            $database = Database::factory()->create([
+                'server_id' => $this->server->id,
+            ]);
+            /** @var DatabaseUser $databaseUser */
+            $databaseUser = DatabaseUser::factory()->create([
+                'server_id' => $this->server->id,
+            ]);
+            $inputs['database'] = $database->id;
+            $inputs['database_user'] = $databaseUser->id;
+        }
 
         /** @var SourceControl $sourceControl */
         $sourceControl = SourceControl::factory()->create([
@@ -67,8 +73,8 @@ class SitesTest extends TestCase
             ->assertJsonFragment([
                 'domain' => $inputs['domain'],
                 'aliases' => $inputs['aliases'] ?? [],
-                'user' => $inputs['user'] ?? $this->server->getSshUser(),
-                'path' => '/home/'.($inputs['user'] ?? $this->server->getSshUser()).'/'.$inputs['domain'],
+                'user' => $inputs['user'],
+                'path' => '/home/'.$inputs['user'].'/'.$inputs['domain'],
             ]);
     }
 
@@ -152,6 +158,30 @@ class SitesTest extends TestCase
             ->assertSuccessful()
             ->assertJsonFragment([
                 'aliases' => ['example.com', 'example.net'],
+            ]);
+    }
+
+    public function test_update_web_directory(): void
+    {
+        SSH::fake();
+
+        Sanctum::actingAs($this->user, ['read', 'write']);
+
+        /** @var Site $site */
+        $site = Site::factory()->create([
+            'server_id' => $this->server->id,
+        ]);
+
+        $this->json('PUT', route('api.projects.servers.sites.web-directory', [
+            'project' => $this->server->project,
+            'server' => $this->server,
+            'site' => $site,
+        ]), [
+            'web_directory' => 'public',
+        ])
+            ->assertSuccessful()
+            ->assertJsonFragment([
+                'web_directory' => 'public',
             ]);
     }
 

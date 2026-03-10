@@ -21,7 +21,7 @@ class CreateDatabaseUser
      */
     public function create(Server $server, array $input, array $links = []): DatabaseUser
     {
-        Validator::make($input, self::rules($server, $input))->validate();
+        $this->validate($server, $input);
 
         $databaseUser = new DatabaseUser([
             'server_id' => $server->id,
@@ -29,6 +29,7 @@ class CreateDatabaseUser
             'password' => $input['password'],
             'host' => (isset($input['remote']) && $input['remote']) || isset($input['host']) ? $input['host'] : 'localhost',
             'databases' => $links,
+            'permission' => $input['permission'] ?? 'admin',
         ]);
 
         /** @var Service $service */
@@ -45,19 +46,15 @@ class CreateDatabaseUser
         $databaseUser->save();
 
         if (count($links) > 0) {
-            app(LinkUser::class)->link($databaseUser, ['databases' => $links]);
+            app(LinkUser::class)->link($databaseUser, [
+                'databases' => $links,
+            ]);
         }
 
         return $databaseUser;
     }
 
-    /**
-     * @param  array<string, mixed>  $input
-     * @return array<string, mixed>
-     *
-     * @throws ValidationException
-     */
-    public static function rules(Server $server, array $input): array
+    private function validate(Server $server, array $input): void
     {
         $rules = [
             'username' => [
@@ -69,11 +66,15 @@ class CreateDatabaseUser
                 'required',
                 'min:6',
             ],
+            'permission' => [
+                'nullable',
+                Rule::in(['read', 'write', 'admin']),
+            ],
         ];
         if (isset($input['remote']) && $input['remote']) {
             $rules['host'] = 'required';
         }
 
-        return $rules;
+        Validator::make($input, $rules)->validate();
     }
 }

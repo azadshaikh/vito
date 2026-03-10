@@ -48,11 +48,13 @@ class HandleInertiaRequests extends Middleware
 
         /** @var ?User $user */
         $user = $request->user();
+        $user?->refresh();
+        $currentProject = $user?->currentProject;
+        $canSeeCurrentProject = $user && $currentProject && $user->can('view', $currentProject);
+        if ($user && (! $currentProject || ! $canSeeCurrentProject)) {
+            $user->ensureHasDefaultProject();
 
-        // servers
-        $servers = [];
-        if ($user && $user->currentProject && $user->can('viewAny', [Server::class, $user->currentProject])) {
-            $servers = ServerResource::collection($user->currentProject->servers);
+            return $this->share($request);
         }
 
         $data = [];
@@ -69,6 +71,7 @@ class HandleInertiaRequests extends Middleware
             // sites
             $sites = [];
             if ($user && $user->can('viewAny', [Site::class, $server])) {
+                // TODO: limit sites
                 $sites = SiteResource::collection($server->sites);
             }
 
@@ -84,15 +87,14 @@ class HandleInertiaRequests extends Middleware
             ...$data,
             'name' => config('app.name'),
             'version' => config('app.version'),
+            'env' => config('app.env'),
             'demo' => config('app.demo'),
             'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => $user ? [
                 'user' => UserResource::make($user->load('projects')),
-                'projects' => ProjectResource::collection($user->allProjects()->get()),
-                'currentProject' => ProjectResource::make($user->currentProject),
+                'currentProject' => ProjectResource::make($currentProject),
             ] : null,
             'public_key_text' => __('servers.create.public_key_text', ['public_key' => get_public_key_content()]),
-            'project_servers' => $servers,
             'configs' => [
                 'operating_systems' => config('core.operating_systems'),
                 'colors' => config('core.colors'),
@@ -115,6 +117,9 @@ class HandleInertiaRequests extends Middleware
                 ],
                 'service' => [
                     'services' => config('service.services'),
+                ],
+                'dns_provider' => [
+                    'providers' => config('dns-provider.providers'),
                 ],
             ],
             'ziggy' => fn (): array => [

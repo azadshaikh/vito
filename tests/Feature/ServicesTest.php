@@ -50,6 +50,48 @@ class ServicesTest extends TestCase
     }
 
     #[DataProvider('data')]
+    public function test_reload_service(string $name): void
+    {
+        $this->actingAs($this->user);
+
+        $service = $this->server->services()->where('name', $name)->firstOrFail();
+        $service->status = ServiceStatus::READY;
+        $service->save();
+
+        SSH::fake('Active: active');
+
+        $this->post(route('services.reload', [
+            'server' => $this->server,
+            'service' => $service->id,
+        ]))
+            ->assertSessionDoesntHaveErrors();
+
+        $service->refresh();
+
+        $this->assertEquals(ServiceStatus::READY, $service->status);
+    }
+
+    #[DataProvider('data')]
+    public function test_failed_to_reload_service(string $name): void
+    {
+        $this->actingAs($this->user);
+
+        $service = $this->server->services()->where('name', $name)->firstOrFail();
+
+        SSH::fake('Active: inactive');
+
+        $this->post(route('services.reload', [
+            'server' => $this->server,
+            'service' => $service->id,
+        ]))
+            ->assertSessionDoesntHaveErrors();
+
+        $service->refresh();
+
+        $this->assertEquals(ServiceStatus::FAILED, $service->status);
+    }
+
+    #[DataProvider('data')]
     public function test_failed_to_restart_service(string $name): void
     {
         $this->actingAs($this->user);
@@ -271,9 +313,10 @@ class ServicesTest extends TestCase
         ]);
     }
 
-    public function test_fetch_php_installed_version(): void
+    #[DataProvider('phpVersionOutputData')]
+    public function test_fetch_php_installed_version(string $sshOutput, string $expectedVersion): void
     {
-        SSH::fake('8.4.10');
+        SSH::fake($sshOutput);
 
         $this->actingAs($this->user);
 
@@ -286,7 +329,19 @@ class ServicesTest extends TestCase
         ]))
             ->assertSessionDoesntHaveErrors();
 
-        $this->assertEquals($service->refresh()->installed_version, '8.4.10');
+        $this->assertEquals($expectedVersion, $service->refresh()->installed_version);
+    }
+
+    /**
+     * @return array<array<string>>
+     */
+    public static function phpVersionOutputData(): array
+    {
+        return [
+            'clean version' => ['8.4.10', '8.4.10'],
+            'version with noise' => ["Deprecated: some deprecation notice in php\n8.5.2", '8.5.2'],
+            'version with whitespace' => ["  8.5.1\n", '8.5.1'],
+        ];
     }
 
     /**

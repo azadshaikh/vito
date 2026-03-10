@@ -55,13 +55,14 @@ class OS
     /**
      * @throws SSHError
      */
-    public function createUser(string $user, string $password, string $key): void
+    public function createUser(string $user, string $password, string $key, bool $clearKeys = false): void
     {
         $this->server->ssh()->exec(
             view('ssh.os.create-user', [
                 'user' => $user,
                 'password' => $password,
                 'key' => $key,
+                'clearKeys' => $clearKeys,
             ]),
             'create-user'
         );
@@ -105,16 +106,17 @@ class OS
         return $this->server->ssh()->exec(
             view('ssh.os.read-file', [
                 'path' => '/home/'.$user.'/.ssh/id_rsa.pub',
-            ])
+            ]),
+            'get-public-key'
         );
     }
 
     /**
      * @throws SSHError
      */
-    public function deploySSHKey(string $key): void
+    public function deploySSHKey(string $key, string $user): void
     {
-        $this->server->ssh()->exec(
+        $this->server->ssh($user)->exec(
             view('ssh.os.deploy-ssh-key', [
                 'key' => $key,
             ]),
@@ -125,12 +127,11 @@ class OS
     /**
      * @throws SSHError
      */
-    public function deleteSSHKey(string $key): void
+    public function deleteSSHKey(string $key, string $user): void
     {
-        $this->server->ssh()->exec(
+        $this->server->ssh($user)->exec(
             view('ssh.os.delete-ssh-key', [
                 'key' => $key,
-                'user' => $this->server->getSshUser(),
             ]),
             'delete-ssh-key'
         );
@@ -159,6 +160,7 @@ class OS
             view('ssh.os.read-ssh-key', [
                 'name' => $name,
             ]),
+            'read-ssh-key'
         );
     }
 
@@ -169,6 +171,7 @@ class OS
     {
         $this->server->ssh()->exec(
             view('ssh.os.reboot'),
+            'reboot'
         );
     }
 
@@ -222,13 +225,24 @@ class OS
      *
      * @throws SSHError
      */
-    public function runScript(string $path, string $script, ?ServerLog $serverLog, ?string $user = null, ?array $variables = []): ServerLog
-    {
+    public function runScript(
+        string $path,
+        string $script,
+        ?ServerLog $serverLog,
+        ?string $user = null,
+        ?array $variables = [],
+        ?array $aliases = []
+    ): ServerLog {
         $ssh = $this->server->ssh($user);
         if ($serverLog instanceof ServerLog) {
             $ssh->setLog($serverLog);
         }
-        $command = '';
+        $command = "shopt -s expand_aliases\n";
+        if ($aliases !== null && $aliases !== []) {
+            foreach ($aliases as $key => $alias) {
+                $command .= "alias $key=$alias\n";
+            }
+        }
         if ($variables !== null && $variables !== []) {
             foreach ($variables as $key => $variable) {
                 $command .= "export $key=$variable\n";
@@ -238,6 +252,8 @@ class OS
             'path' => $path,
             'script' => $script,
         ]);
+
+        info($command);
 
         $ssh->exec($command, 'run-script');
 
@@ -256,7 +272,8 @@ class OS
             view('ssh.os.download', [
                 'url' => $url,
                 'path' => $path,
-            ])
+            ]),
+            'download'
         );
     }
 
@@ -336,7 +353,8 @@ class OS
         $this->server->ssh()->write(
             $path,
             $content,
-            $user
+            $user,
+            'write-file'
         );
     }
 
@@ -346,5 +364,50 @@ class OS
     public function mkdir(string $path, ?string $user = null): string
     {
         return $this->server->ssh($user)->exec('mkdir -p '.$path);
+    }
+
+    /**
+     * @throws SSHError
+     */
+    public function compress(string $sourcePath, string $zipPath): void
+    {
+        $this->server->ssh()->exec(
+            view('ssh.os.compress', [
+                'sourcePath' => $sourcePath,
+                'zipPath' => $zipPath,
+            ]),
+            'compress'
+        );
+    }
+
+    /**
+     * @throws SSHError
+     */
+    public function extractArchive(string $backupPath, string $restorePath, ?string $owner = null, ?string $permissions = null): void
+    {
+        $this->server->ssh()->exec(
+            view('ssh.os.extract-archive', [
+                'backupPath' => $backupPath,
+                'restorePath' => $restorePath,
+                'owner' => $owner,
+                'permissions' => $permissions,
+            ]),
+            'extract-archive'
+        );
+    }
+
+    /**
+     * Clear a remote log file while preserving permissions and ownership
+     *
+     * @throws SSHError
+     */
+    public function clearFile(string $path): void
+    {
+        $this->server->ssh()->exec(
+            view('ssh.os.clear-file', [
+                'path' => $path,
+            ]),
+            'clear-file'
+        );
     }
 }

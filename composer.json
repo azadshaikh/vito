@@ -11,6 +11,7 @@
     "php": "^8.4",
     "ext-ftp": "*",
     "ext-intl": "*",
+    "ext-zip": "*",
     "aws/aws-sdk-php": "^3.158",
     "inertiajs/inertia-laravel": "^2.0",
     "laravel/fortify": "^1.17",
@@ -22,12 +23,13 @@
     "opcodesio/log-viewer": "^3.17",
     "phpseclib/phpseclib": "3.0.43",
     "spatie/laravel-route-attributes": "^1.24",
+    "symfony/yaml": "^7.3",
     "tightenco/ziggy": "^2.5"
   },
   "require-dev": {
     "fakerphp/faker": "^1.9.1",
-    "knuckleswtf/scribe": "^5.0",
     "larastan/larastan": "^3.1",
+    "laravel/boost": "^1.1",
     "laravel/pail": "^1.2",
     "laravel/pint": "^1.10",
     "laravel/sail": "^1.18",
@@ -72,6 +74,10 @@
       "npm run format",
       "npm run lint",
       "@php artisan test"
+    ],
+    "dev": [
+      "Composer\\Config::disableProcessTimeout",
+      "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74,#fabb74\" \"php artisan serve\" \"php artisan horizon\" \"php artisan schedule:work\" \"php artisan pail --timeout=0\" \"npm run dev\" --names=server,horizon,logs,vite"
     ]
   },
   "repositories": [

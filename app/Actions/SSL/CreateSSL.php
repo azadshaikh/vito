@@ -4,11 +4,10 @@ namespace App\Actions\SSL;
 
 use App\Enums\SslStatus;
 use App\Enums\SslType;
+use App\Jobs\SSL\CreateJob;
 use App\Models\ServerLog;
-use App\Models\Service;
 use App\Models\Site;
 use App\Models\Ssl;
-use App\Services\Webserver\Webserver;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -22,7 +21,7 @@ class CreateSSL
      */
     public function create(Site $site, array $input): Ssl
     {
-        Validator::make($input, self::rules($input))->validate();
+        $this->validate($input);
 
         $site->ssls()
             ->where('type', $input['type'])
@@ -34,7 +33,7 @@ class CreateSSL
             'type' => $input['type'],
             'certificate' => $input['certificate'] ?? null,
             'pk' => $input['private'] ?? null,
-            'expires_at' => $input['type'] === SslType::LETSENCRYPT ? now()->addMonths(3) : $input['expires_at'],
+            'expires_at' => $input['type'] === SslType::LETSENCRYPT->value ? now()->addMonths(3) : $input['expires_at'],
             'status' => SslStatus::CREATING,
             'email' => $input['email'] ?? null,
             'is_active' => ! $site->activeSsl,
@@ -46,30 +45,12 @@ class CreateSSL
         $ssl->log_id = ServerLog::log($site->server, 'create-ssl', '', $site)->id;
         $ssl->save();
 
-        dispatch(function () use ($site, $ssl): void {
-            /** @var Service $service */
-            $service = $site->server->webserver();
-            /** @var Webserver $webserver */
-            $webserver = $service->handler();
-            $webserver->setupSSL($ssl);
-            $ssl->status = SslStatus::CREATED;
-            $ssl->save();
-            $webserver->updateVHost($site->refresh(), regenerate: [
-                'port',
-            ]);
-        })->catch(function () use ($ssl): void {
-            $ssl->status = SslStatus::FAILED;
-            $ssl->save();
-        })->onQueue('ssh-unique');
+        dispatch(new CreateJob($site, $ssl))->onQueue('ssh');
 
         return $ssl;
     }
 
-    /**
-     * @param  array<string, mixed>  $input
-     * @return array<string, mixed>
-     */
-    public static function rules(array $input): array
+    private function validate(array $input): void
     {
         $rules = [
             'type' => [
@@ -93,6 +74,6 @@ class CreateSSL
             ];
         }
 
-        return $rules;
+        Validator::make($input, $rules)->validate();
     }
 }

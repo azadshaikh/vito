@@ -20,9 +20,16 @@ class EditWorker
      */
     public function edit(Worker $worker, array $input): Worker
     {
-        Validator::make($input, self::rules($worker, $worker->site))->validate();
+        $this->validate($worker, $input, $worker->site);
+
+        // Determine site_id: use from input if provided
+        $siteId = $worker->site_id;
+        if (isset($input['site_id'])) {
+            $siteId = ! empty($input['site_id']) ? (int) $input['site_id'] : null;
+        }
 
         $worker->fill([
+            'site_id' => $siteId,
             'name' => $input['name'],
             'command' => $input['command'],
             'user' => $input['user'],
@@ -61,12 +68,9 @@ class EditWorker
         return $worker;
     }
 
-    /**
-     * @return array<string, array<string>>
-     */
-    public static function rules(Worker $worker, ?Site $site = null): array
+    private function validate(Worker $worker, array $input, ?Site $site = null): void
     {
-        return [
+        $rules = [
             'name' => [
                 'required',
                 'string',
@@ -102,5 +106,16 @@ class EditWorker
                 'min:1',
             ],
         ];
+
+        // Add site_id validation if provided in input
+        if (isset($input['site_id']) && ! empty($input['site_id'])) {
+            $rules['site_id'] = [
+                'required',
+                'integer',
+                Rule::exists('sites', 'id')->where('server_id', $worker->server_id),
+            ];
+        }
+
+        Validator::make($input, $rules)->validate();
     }
 }

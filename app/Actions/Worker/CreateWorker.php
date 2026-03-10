@@ -21,11 +21,17 @@ class CreateWorker
      */
     public function create(Server $server, array $input, ?Site $site = null): Worker
     {
-        Validator::make($input, self::rules($server, $site))->validate();
+        $this->validate($server, $input, $site);
+
+        // Determine site_id: use provided site or from input
+        $siteId = $site?->id;
+        if (! $site && isset($input['site_id']) && ! empty($input['site_id'])) {
+            $siteId = (int) $input['site_id'];
+        }
 
         $worker = new Worker([
             'server_id' => $server->id,
-            'site_id' => $site?->id,
+            'site_id' => $siteId,
             'name' => $input['name'],
             'command' => $input['command'],
             'user' => $input['user'],
@@ -61,12 +67,9 @@ class CreateWorker
         return $worker;
     }
 
-    /**
-     * @return array<string, array<string>>
-     */
-    public static function rules(Server $server, ?Site $site = null): array
+    private function validate(Server $server, array $input, ?Site $site = null): void
     {
-        return [
+        $rules = [
             'name' => [
                 'required',
                 'string',
@@ -101,5 +104,16 @@ class CreateWorker
                 'min:1',
             ],
         ];
+
+        // Add site_id validation if provided in input
+        if (isset($input['site_id']) && ! empty($input['site_id'])) {
+            $rules['site_id'] = [
+                'required',
+                'integer',
+                Rule::exists('sites', 'id')->where('server_id', $server->id),
+            ];
+        }
+
+        Validator::make($input, $rules)->validate();
     }
 }

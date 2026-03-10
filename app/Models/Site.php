@@ -5,7 +5,6 @@ namespace App\Models;
 use App\Enums\RedirectStatus;
 use App\Enums\SiteStatus;
 use App\Enums\SslStatus;
-use App\Exceptions\FailedToDestroyGitHook;
 use App\Exceptions\SourceControlIsNotConnected;
 use App\Exceptions\SSHError;
 use App\Services\PHP\PHP;
@@ -18,7 +17,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
-use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
@@ -38,7 +36,7 @@ use RuntimeException;
  * @property string $repository
  * @property string $ssh_key
  * @property string $branch
- * @property string $status
+ * @property SiteStatus $status
  * @property int $port
  * @property int $progress
  * @property string $user
@@ -98,16 +96,7 @@ class Site extends AbstractModel
         'aliases' => 'array',
         'source_control_id' => 'integer',
         'force_ssl' => 'boolean',
-    ];
-
-    /**
-     * @var array<string, string>
-     */
-    public static array $statusColors = [
-        SiteStatus::READY => 'success',
-        SiteStatus::INSTALLING => 'warning',
-        SiteStatus::INSTALLATION_FAILED => 'danger',
-        SiteStatus::DELETING => 'danger',
+        'status' => SiteStatus::class,
     ];
 
     public static function boot(): void
@@ -122,11 +111,7 @@ class Site extends AbstractModel
             $site->ssls()->delete();
             $site->deployments()->delete();
             $site->deploymentScript()->delete();
-            try {
-                $site->gitHook?->destroyHook();
-            } catch (FailedToDestroyGitHook) {
-                $site->refresh()->gitHook?->delete();
-            }
+            $site->gitHook?->destroyHook();
         });
 
         static::created(function (Site $site): void {
@@ -260,19 +245,19 @@ class Site extends AbstractModel
     }
 
     /**
+     * @return HasMany<CronJob, covariant $this>
+     */
+    public function cronJobs(): HasMany
+    {
+        return $this->hasMany(CronJob::class);
+    }
+
+    /**
      * @return HasMany<Ssl, covariant $this>
      */
     public function ssls(): HasMany
     {
         return $this->hasMany(Ssl::class);
-    }
-
-    /**
-     * @return MorphToMany<Tag, covariant $this>
-     */
-    public function tags(): MorphToMany
-    {
-        return $this->morphToMany(Tag::class, 'taggable');
     }
 
     /**
@@ -396,7 +381,6 @@ class Site extends AbstractModel
 
     /**
      * @throws SourceControlIsNotConnected
-     * @throws FailedToDestroyGitHook
      */
     public function disableAutoDeployment(): void
     {
@@ -441,6 +425,16 @@ class Site extends AbstractModel
             'COMMIT_ID' => $deployment->commit_id ?? '',
             'PHP_VERSION' => $this->php_version,
             'PHP_PATH' => '/usr/bin/php'.$this->php_version,
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function environmentAliases(): array
+    {
+        return [
+            'php' => '/usr/bin/php'.$this->php_version,
         ];
     }
 
@@ -555,5 +549,10 @@ class Site extends AbstractModel
     public function basePath(): string
     {
         return preg_replace('#/current$#', '', $this->path);
+    }
+
+    public function getDeployKeyName(): string
+    {
+        return $this->domain.'-key-'.$this->id;
     }
 }

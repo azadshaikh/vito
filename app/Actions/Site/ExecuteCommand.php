@@ -16,7 +16,7 @@ class ExecuteCommand
      */
     public function execute(Command $command, User $user, array $input): CommandExecution
     {
-        Validator::make($input, self::rules($command))->validate();
+        $this->validate($command, $input);
 
         $variables = [];
         foreach ($command->getVariables() as $variable) {
@@ -48,7 +48,8 @@ class ExecuteCommand
                 script: $content,
                 serverLog: $log,
                 user: $command->site->user,
-                variables: $execution->variables
+                variables: $execution->variables,
+                aliases: $command->site->environmentAliases(),
             );
             $execution->status = CommandExecutionStatus::COMPLETED;
             $execution->save();
@@ -60,10 +61,7 @@ class ExecuteCommand
         return $execution;
     }
 
-    /**
-     * @return array<string, string|array<int, mixed>>
-     */
-    public static function rules(Command $command): array
+    private function validate(Command $command, array $input): void
     {
         $rules = [];
         foreach ($command->getVariables() as $variable) {
@@ -74,6 +72,6 @@ class ExecuteCommand
             ];
         }
 
-        return $rules;
+        Validator::make($input, $rules)->validate();
     }
 }

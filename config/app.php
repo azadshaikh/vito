@@ -198,9 +198,11 @@ return [
         App\Providers\ServerProviderServiceProvider::class,
         App\Providers\StorageProviderServiceProvider::class,
         App\Providers\SourceControlServiceProvider::class,
+        App\Providers\DNSProviderServiceProvider::class,
         App\Providers\NotificationChannelServiceProvider::class,
         App\Providers\ServiceTypeServiceProvider::class,
         App\Providers\HorizonServiceProvider::class,
+        App\Providers\WorkflowServiceProvider::class,
     ],
 
     /*
@@ -218,9 +220,11 @@ return [
         // 'ExampleClass' => App\Example\ExampleClass::class,
     ])->toArray(),
 
-    'version' => '3.5.0',
+    'version' => '3.20.3',
 
     'demo' => env('APP_DEMO', false),
 
     'force_https' => env('FORCE_HTTPS', false),
+
+    'self_hosted' => env('SELF_HOSTED', true),
 ];

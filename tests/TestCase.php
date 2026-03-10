@@ -3,7 +3,6 @@
 namespace Tests;
 
 use App\Enums\ServiceStatus;
-use App\Enums\UserRole;
 use App\Models\NotificationChannel;
 use App\Models\Redirect;
 use App\Models\Server;
@@ -43,12 +42,11 @@ abstract class TestCase extends BaseTestCase
         parent::setUp();
 
         config()->set('queue.connections.ssh.driver', 'sync');
+        config()->set('queue.connections.default.driver', 'sync');
         config()->set('filesystems.disks.key-pairs.root', storage_path('app/key-pairs-test'));
 
-        $this->user = User::factory()->create([
-            'role' => UserRole::ADMIN,
-        ]);
-        $this->user->createDefaultProject();
+        $this->user = User::factory()->create();
+        $this->user->ensureHasDefaultProject();
 
         $this->notificationChannel = NotificationChannel::factory()->create([
             'provider' => Email::id(),

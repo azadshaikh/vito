@@ -1,5 +1,16 @@
 #!/bin/bash
 
+echo "
+ __      ___ _        _____             _
+ \ \    / (_) |      |  __ \           | |
+  \ \  / / _| |_ ___ | |  | | ___ _ __ | | ___  _   _
+   \ \/ / | | __/ _ \| |  | |/ _ \ '_ \| |/ _ \| | | |
+    \  /  | | || (_) | |__| |  __/ |_) | | (_) | |_| |
+     \/   |_|\__\___/|_____/ \___| .__/|_|\___/ \__, |
+                                 | |             __/ |
+                                 |_|            |___/
+"
+
 export VITO_VERSION="3.x"
 export DEBIAN_FRONTEND=noninteractive
 export NEEDRESTART_MODE=a
@@ -190,9 +201,6 @@ chmod 600 /home/vito/vito/storage/ssh-private.pem
 ssh-keygen -y -f /home/vito/vito/storage/ssh-private.pem >/home/vito/vito/storage/ssh-public.key
 chown -R vito:vito /home/vito/vito/storage/ssh-private.pem
 chown -R vito:vito /home/vito/vito/storage/ssh-public.key
-
-# install plugins
-php artisan plugins:install https://github.com/vitodeploy/laravel-octane-plugin
 
 # optimize
 php artisan optimize

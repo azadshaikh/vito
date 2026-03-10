@@ -3,8 +3,8 @@ import axios from 'axios';
 import { Repo } from '@/types/repo';
 import { BadgeCheckIcon, LoaderCircleIcon, StarIcon } from 'lucide-react';
 import { CardRow } from '@/components/ui/card';
-import React, { Fragment } from 'react';
-import Install from '@/pages/plugins/components/install';
+import { Fragment } from 'react';
+import Install from '@/pages/plugins/components/quick-install';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 
@@ -41,7 +41,7 @@ export default function OfficialPlugins() {
           {query.data.pages.map((page) =>
             page.items.map((repo) => (
               <Fragment key={repo.id}>
-                <CardRow key={repo.id}>
+                <CardRow>
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-2">
                       <a href={repo.html_url} target="_blank" className="hover:text-primary">
@@ -56,7 +56,7 @@ export default function OfficialPlugins() {
                       <StarIcon />
                       {repo.stargazers_count}
                     </Button>
-                    <Install repo={repo} />
+                    <Install url={repo.html_url} />
                   </div>
                 </CardRow>
                 {!(page.items[page.items.length - 1].id === repo.id && page === query.data.pages[query.data.pages.length - 1]) && (

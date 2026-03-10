@@ -43,6 +43,22 @@ class Nginx extends AbstractWebserver
             'root'
         );
 
+        $this->service->server->ssh()->exec(
+            view('ssh.services.webserver.nginx.create-default-ssl'),
+            'create-default-ssl'
+        );
+
+        $this->service->server->ssh()->write(
+            '/etc/nginx/sites-available/000-default-ssl',
+            view('ssh.services.webserver.nginx.default-ssl-vhost'),
+            'root'
+        );
+
+        $this->service->server->ssh()->exec(
+            'sudo ln -sf /etc/nginx/sites-available/000-default-ssl /etc/nginx/sites-enabled/000-default-ssl',
+            'enable-default-ssl'
+        );
+
         $this->service->server->systemd()->restart('nginx');
         event('service.installed', $this->service);
         $this->service->server->os()->cleanup();
@@ -97,7 +113,7 @@ class Nginx extends AbstractWebserver
     /**
      * @throws SSHError
      */
-    public function updateVHost(Site $site, ?string $vhost = null, array $replace = [], array $regenerate = [], array $append = []): void
+    public function updateVHost(Site $site, ?string $vhost = null, array $replace = [], array $regenerate = [], array $append = [], bool $restart = true): void
     {
         if (! $vhost) {
             $vhost = $this->getVHost($site);
@@ -113,7 +129,13 @@ class Nginx extends AbstractWebserver
             'root'
         );
 
-        $this->service->server->systemd()->restart('nginx');
+        if ($restart) {
+            $this->service->server->systemd()->restart('nginx');
+
+            return;
+        }
+
+        $this->service->server->systemd()->reload('nginx');
     }
 
     /**

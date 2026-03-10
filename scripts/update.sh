@@ -4,6 +4,10 @@ echo "Updating Vito..."
 
 cd /home/vito/vito
 
+echo "Discarding any possible local changes..."
+git reset --hard HEAD
+git clean -fd
+
 echo "Pulling changes..."
 git fetch --all
 
@@ -35,9 +39,6 @@ composer install --no-dev
 
 echo "Running migrations..."
 php artisan migrate --force
-
-echo "Reloading plugins..."
-php artisan plugins:load
 
 echo "Optimizing..."
 php artisan optimize:clear

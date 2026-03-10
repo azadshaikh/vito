@@ -32,8 +32,9 @@ class ServerLogController extends Controller
     {
         $this->authorize('viewAny', [ServerLog::class, $server]);
 
-        $logs = QueryBuilder::for($server->logs()->where('is_remote', 0)->latest())
+        $logs = QueryBuilder::for($server->logs()->where('is_remote', 0))
             ->searchableFields(['name'])
+            ->sortable('created_at', 'desc')
             ->query()
             ->simplePaginate(config('web.pagination_size'));
 
@@ -56,14 +57,14 @@ class ServerLogController extends Controller
     }
 
     #[Get('/json/{site?}', name: 'logs.json')]
-    public function json(Server $server, ?Site $site = null): ResourceCollection
+    public function json(Request $request, Server $server, ?Site $site = null): ResourceCollection
     {
         $this->authorize('viewAny', [ServerLog::class, $server]);
 
         $logs = $server->logs()
             ->when($site, fn ($query) => $query->where('site_id', $site->id))
             ->latest()
-            ->simplePaginate(config('web.pagination_size'));
+            ->simplePaginate($request->query('count') ?? config('web.pagination_size'));
 
         return ServerLogResource::collection($logs);
     }
@@ -115,5 +116,15 @@ class ServerLogController extends Controller
         $log->delete();
 
         return back()->with('success', 'Log deleted successfully');
+    }
+
+    #[Post('{log}/clear', name: 'logs.clear')]
+    public function clear(Server $server, ServerLog $log): RedirectResponse
+    {
+        $this->authorize('update', $log);
+
+        $log->clear();
+
+        return back()->with('success', 'Log cleared successfully');
     }
 }

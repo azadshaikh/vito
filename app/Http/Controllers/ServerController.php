@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Server\CreateServer;
+use App\Actions\Server\GetServers;
 use App\Actions\Server\RebootServer;
 use App\Actions\Server\TransferServer;
 use App\Actions\Server\Update;
@@ -45,7 +46,7 @@ class ServerController extends Controller
         return Inertia::render('servers/index', [
             'servers' => ServerResource::collection($servers),
             'public_key' => __('servers.create.public_key_text', ['public_key' => get_public_key_content()]),
-            'server_providers' => ServerProviderResource::collection(ServerProvider::getByProjectId($project->id)->get()),
+            'server_providers' => ServerProviderResource::collection(ServerProvider::getByProjectId($project->id, user())->get()),
         ]);
     }
 
@@ -56,16 +57,7 @@ class ServerController extends Controller
 
         $this->authorize('viewAny', [Server::class, $project]);
 
-        $this->validate($request, [
-            'query' => [
-                'nullable',
-                'string',
-            ],
-        ]);
-
-        $servers = $project->servers()->where('name', 'like', "%{$request->input('query')}%")
-            ->take(10)
-            ->get();
+        $servers = app(GetServers::class)->get($project, $request->input(), 10);
 
         return ServerResource::collection($servers);
     }
@@ -110,8 +102,8 @@ class ServerController extends Controller
         $server->refresh();
 
         return back()
-            ->with($server->getStatusColor(), __('Server status is :status', [
-                'status' => $server->status,
+            ->with($server->status->getColor(), __('Server status is :status', [
+                'status' => $server->status->getText(),
             ]));
     }
 
@@ -151,6 +143,8 @@ class ServerController extends Controller
     #[Post('/{server}/transfer', name: 'servers.transfer')]
     public function transfer(Server $server, Request $request): RedirectResponse
     {
+        $this->authorize('delete', $server);
+
         $server = app(TransferServer::class)->transfer(user(), $server, $request->all());
 
         user()->update(['current_project_id' => $server->project_id]);

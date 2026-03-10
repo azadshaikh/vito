@@ -54,10 +54,16 @@ interface SourceControlProvider
     /**
      * @throws FailedToDeployGitKey
      */
-    public function deployKey(string $title, string $repo, string $key): void;
+    public function deployKey(string $title, string $repo, string $key): string;
+
+    public function deleteDeployKey(string $keyId, string $repo): void;
 
     /**
      * @param  array<string, mixed>  $payload
      */
     public function getWebhookBranch(array $payload): string;
+
+    public function getRepos(bool $useCache = true): array;
+
+    public function getBranches(string $repo, bool $useCache = true): array;
 }

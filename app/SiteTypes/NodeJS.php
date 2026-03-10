@@ -86,14 +86,14 @@ class NodeJS extends AbstractSiteType
         $this->deployKey();
         $this->progress(30);
         app(Git::class)->clone($this->site);
-        $this->site->server->ssh()->exec(
+        $this->site->server->ssh($this->site->user)->exec(
             __('npm install --prefix=:path', [
                 'path' => $this->site->path,
             ]),
             'install-npm-dependencies',
             $this->site->id
         );
-        $this->site->server->ssh()->exec(
+        $this->site->server->ssh($this->site->user)->exec(
             __('npm run build --prefix=:path', [
                 'path' => $this->site->path,
             ]),
@@ -153,6 +153,7 @@ class NodeJS extends AbstractSiteType
 
         if ($webserver === 'caddy') {
             return view('ssh.services.webserver.caddy.vhost', [
+                'site' => $this->site,
                 'main' => [
                     view('ssh.services.webserver.caddy.vhost-blocks.force-ssl', ['site' => $this->site]),
                     view('ssh.services.webserver.caddy.vhost-blocks.port', ['site' => $this->site]),

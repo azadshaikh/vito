@@ -1,4 +1,4 @@
-import React, { FormEvent, ReactNode, useState } from 'react';
+import { FormEvent, ReactNode, useState } from 'react';
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Form, FormField, FormFields } from '@/components/ui/form';
 import { useForm } from '@inertiajs/react';
@@ -11,9 +11,11 @@ import { registerBashLanguage } from '@/lib/editor';
 import { Editor, useMonaco } from '@monaco-editor/react';
 import { useAppearance } from '@/hooks/use-appearance';
 import { Script } from '@/types/script';
+import { useInputFocus } from '@/stores/useInputFocus';
 
 export default function ScriptForm({ script, children }: { script?: Script; children: ReactNode }) {
   const { getActualAppearance } = useAppearance();
+  const setFocused = useInputFocus((state) => state.setFocused);
 
   const [open, setOpen] = useState(false);
 
@@ -22,15 +24,28 @@ export default function ScriptForm({ script, children }: { script?: Script; chil
     content: string;
   }>({
     name: script?.name ?? '',
-    content: script?.script ?? '',
+    content: script?.content ?? '',
   });
+
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    setFocused(isOpen);
+  };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    const url = script ? route('scripts.update', { script: script.id }) : route('scripts.store');
-    form.post(url, {
+    if (script) {
+      form.put(route('scripts.update', { script: script.id }), {
+        onSuccess: () => {
+          handleOpenChange(false);
+        },
+      });
+      return;
+    }
+
+    form.post(route('scripts'), {
       onSuccess: () => {
-        setOpen(false);
+        handleOpenChange(false);
       },
     });
   };
@@ -38,7 +53,7 @@ export default function ScriptForm({ script, children }: { script?: Script; chil
   registerBashLanguage(useMonaco());
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetTrigger asChild>{children}</SheetTrigger>
       <SheetContent className="sm:max-w-5xl">
         <SheetHeader>
@@ -58,7 +73,7 @@ export default function ScriptForm({ script, children }: { script?: Script; chil
               <div className="overflow-hidden rounded-md border">
                 <Editor
                   defaultLanguage="bash"
-                  value={form.data.content}
+                  defaultValue={form.data.content}
                   theme={getActualAppearance() === 'dark' ? 'vs-dark' : 'vs'}
                   className="h-[500px]"
                   onChange={(value) => form.setData('content', value ?? '')}

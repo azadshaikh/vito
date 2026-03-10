@@ -28,8 +28,12 @@ class StorageProviderController extends Controller
     {
         $this->authorize('viewAny', StorageProvider::class);
 
+        $user = user();
+        $storageProviders = StorageProvider::getByProjectId($user->current_project_id, $user)
+            ->simplePaginate(config('web.pagination_size'));
+
         return Inertia::render('storage-providers/index', [
-            'storageProviders' => StorageProviderResource::collection(StorageProvider::getByProjectId(user()->current_project_id)->simplePaginate(config('web.pagination_size'))),
+            'storageProviders' => StorageProviderResource::collection($storageProviders),
         ]);
     }
 
@@ -38,7 +42,11 @@ class StorageProviderController extends Controller
     {
         $this->authorize('viewAny', StorageProvider::class);
 
-        return StorageProviderResource::collection(StorageProvider::getByProjectId(user()->current_project_id)->get());
+        $user = user();
+        $storageProviders = StorageProvider::getByProjectId($user->current_project_id, $user)
+            ->get();
+
+        return StorageProviderResource::collection($storageProviders);
     }
 
     #[Post('/', name: 'storage-providers.store')]
@@ -46,7 +54,7 @@ class StorageProviderController extends Controller
     {
         $this->authorize('create', StorageProvider::class);
 
-        app(CreateStorageProvider::class)->create(user(), user()->currentProject, $request->all());
+        app(CreateStorageProvider::class)->create(user(), $request->all());
 
         return back()->with('success', 'Storage provider created.');
     }
@@ -56,7 +64,7 @@ class StorageProviderController extends Controller
     {
         $this->authorize('update', $storageProvider);
 
-        app(EditStorageProvider::class)->edit($storageProvider, user()->currentProject, $request->all());
+        app(EditStorageProvider::class)->edit($storageProvider, $request->all());
 
         return back()->with('success', 'Storage provider updated.');
     }

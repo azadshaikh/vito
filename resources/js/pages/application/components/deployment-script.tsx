@@ -12,6 +12,9 @@ import { useAppearance } from '@/hooks/use-appearance';
 import { DeploymentScript as DeploymentScriptType } from '@/types/deployment-script';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { StatusRipple } from '@/components/status-ripple';
+import { useInputFocus } from '@/stores/useInputFocus';
 
 export default function DeploymentScript({
   site,
@@ -25,6 +28,7 @@ export default function DeploymentScript({
   children: ReactNode;
 }) {
   const { getActualAppearance } = useAppearance();
+  const setFocused = useInputFocus((state) => state.setFocused);
 
   const [open, setOpen] = useState(false);
   const form = useForm<{
@@ -35,11 +39,16 @@ export default function DeploymentScript({
     restart_workers: script.configs.restart_workers,
   });
 
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    setFocused(isOpen);
+  };
+
   const submit = (e: FormEvent) => {
     e.preventDefault();
     form.put(route('application.update-deployment-script', { server: site.server_id, site: site.id, deploymentScript: script.id }), {
       onSuccess: () => {
-        setOpen(false);
+        handleOpenChange(false);
       },
     });
   };
@@ -47,24 +56,34 @@ export default function DeploymentScript({
   registerBashLanguage(useMonaco());
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetTrigger asChild>{children}</SheetTrigger>
       <SheetContent className="sm:max-w-5xl">
         <SheetHeader>
           <SheetTitle className="capitalize">{script.name} script</SheetTitle>
           <SheetDescription>{description || 'Update script'}</SheetDescription>
         </SheetHeader>
-        <Form id="update-script-form" className="h-full gap-0" onSubmit={submit}>
-          <Editor
-            defaultLanguage="bash"
-            value={form.data.script}
-            theme={getActualAppearance() === 'dark' ? 'vs-dark' : 'vs'}
-            className="h-full"
-            onChange={(value) => form.setData('script', value ?? '')}
-            options={{
-              fontSize: 15,
-            }}
-          />
+        <Form id="update-script-form" className="relative h-full flex-col gap-0" onSubmit={submit}>
+          <div className="relative flex-1">
+            <Editor
+              defaultLanguage="bash"
+              value={form.data.script}
+              theme={getActualAppearance() === 'dark' ? 'vs-dark' : 'vs'}
+              className="h-full"
+              onChange={(value) => form.setData('script', value ?? '')}
+              options={{
+                fontSize: 15,
+              }}
+            />
+            <div className="absolute! right-0 bottom-4 left-0 z-10 mx-auto max-w-5xl px-4">
+              <Alert>
+                <AlertDescription className="flex items-center gap-2">
+                  <StatusRipple variant="default" />
+                  <p>Using `php` command in your script will use the PHP version of the site.</p>
+                </AlertDescription>
+              </Alert>
+            </div>
+          </div>
           {['default', 'pre-flight'].includes(script.name) && (
             <FormFields className="p-4">
               <FormField className="mb-0">

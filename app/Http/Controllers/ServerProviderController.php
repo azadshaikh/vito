@@ -29,8 +29,10 @@ class ServerProviderController extends Controller
     {
         $this->authorize('viewAny', ServerProvider::class);
 
+        $user = user();
+
         return Inertia::render('server-providers/index', [
-            'serverProviders' => ServerProviderResource::collection(ServerProvider::getByProjectId(user()->current_project_id)->simplePaginate(config('web.pagination_size'))),
+            'serverProviders' => ServerProviderResource::collection(ServerProvider::getByProjectId($user->current_project_id, $user)->simplePaginate(config('web.pagination_size'))),
         ]);
     }
 
@@ -39,7 +41,9 @@ class ServerProviderController extends Controller
     {
         $this->authorize('viewAny', ServerProvider::class);
 
-        return ServerProviderResource::collection(ServerProvider::getByProjectId(user()->current_project_id)->get());
+        $user = user();
+
+        return ServerProviderResource::collection(ServerProvider::getByProjectId($user->current_project_id, $user)->get());
     }
 
     #[Post('/', name: 'server-providers.store')]
@@ -47,7 +51,7 @@ class ServerProviderController extends Controller
     {
         $this->authorize('create', ServerProvider::class);
 
-        app(CreateServerProvider::class)->create(user(), user()->currentProject, $request->all());
+        app(CreateServerProvider::class)->create(user(), $request->all());
 
         return back()->with('success', 'Server provider created.');
     }
@@ -57,7 +61,7 @@ class ServerProviderController extends Controller
     {
         $this->authorize('update', $serverProvider);
 
-        app(EditServerProvider::class)->edit($serverProvider, user()->currentProject, $request->all());
+        app(EditServerProvider::class)->edit($serverProvider, $request->all());
 
         return back()->with('success', 'Server provider updated.');
     }

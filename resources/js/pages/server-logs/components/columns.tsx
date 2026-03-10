@@ -29,7 +29,7 @@ export function View({ serverLog, children }: { serverLog: ServerLog; children?:
     queryFn: async () => {
       try {
         const response = await axios.get(route('logs.show', { server: serverLog.server_id, log: serverLog.id }));
-        return response.data;
+        return typeof response.data === 'string' ? response.data : JSON.stringify(response.data, null, 2);
       } catch (error: unknown) {
         if (axios.isAxiosError(error)) {
           throw new Error(error.response?.data?.error || 'An error occurred while fetching the log');
@@ -75,6 +75,48 @@ export function Download({ serverLog, children }: { serverLog: ServerLog; childr
     <a href={route('logs.download', { server: serverLog.server_id, log: serverLog.id })} target="_blank">
       {children}
     </a>
+  );
+}
+
+function Clear({ serverLog }: { serverLog: ServerLog }) {
+  const [open, setOpen] = useState(false);
+  const form = useForm();
+
+  const submit = () => {
+    form.post(route('logs.clear', { server: serverLog.server_id, log: serverLog.id }), {
+      onSuccess: () => {
+        setOpen(false);
+      },
+    });
+  };
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>Clear</DropdownMenuItem>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Clear {serverLog.name}</DialogTitle>
+          <DialogDescription className="sr-only">Clear log contents</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2 p-4">
+          <p>
+            Are you sure you want to clear the contents of <strong>{serverLog.name}</strong>?
+          </p>
+          <p className="text-muted-foreground text-sm">This will remove all content from the log file but keep the file itself.</p>
+        </div>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline">Cancel</Button>
+          </DialogClose>
+          <Button disabled={form.processing} onClick={submit}>
+            {form.processing && <LoaderCircleIcon className="animate-spin" />}
+            <FormSuccessful successful={form.recentlySuccessful} />
+            Clear
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -155,6 +197,7 @@ export const columns: ColumnDef<ServerLog>[] = [
                 <DropdownMenuItem>Download</DropdownMenuItem>
               </Download>
               <DropdownMenuSeparator />
+              {row.original.is_remote && <Clear serverLog={row.original} />}
               <Delete serverLog={row.original} />
             </DropdownMenuContent>
           </DropdownMenu>

@@ -3,6 +3,8 @@
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ProcessUtils;
 use Symfony\Component\Process\PhpExecutableFinder;
@@ -227,7 +229,7 @@ function format_nginx_config(string $config): string
 function user(): User
 {
     /** @var User $user */
-    $user = auth()->user();
+    $user = Auth::user();
 
     return $user;
 }
@@ -297,4 +299,9 @@ function move_directory(string $from, string $to): void
     }
 
     File::deleteDirectory($from);
+}
+
+function is_self_hosted(): bool
+{
+    return config('app.self_hosted', true);
 }

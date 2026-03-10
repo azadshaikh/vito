@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use App\Actions\Server\CheckConnection;
+use App\Enums\OperatingSystem;
 use App\Enums\ServerStatus;
 use App\Enums\ServiceStatus;
 use App\Exceptions\SSHError;
 use App\Facades\SSH;
+use App\ServerFeatures\ActionInterface;
 use App\SSH\OS\Cron;
 use App\SSH\OS\OS;
 use App\SSH\OS\Systemd;
@@ -17,7 +19,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -34,7 +35,7 @@ use Throwable;
  * @property string $ip
  * @property ?string $local_ip
  * @property int $port
- * @property string $os
+ * @property OperatingSystem $os
  * @property string $type
  * @property array<string, mixed> $type_data
  * @property string $provider
@@ -42,7 +43,7 @@ use Throwable;
  * @property array<string, mixed> $provider_data
  * @property array<string, mixed> $authentication
  * @property string $public_key
- * @property string $status
+ * @property ServerStatus $status
  * @property bool $auto_update
  * @property int|float $progress
  * @property ?string $progress_step
@@ -59,7 +60,6 @@ use Throwable;
  * @property Collection<int, Worker> $queues
  * @property Collection<int, Backup> $backups
  * @property Collection<int, SshKey> $sshKeys
- * @property Collection<int, Tag> $tags
  * @property string $hostname
  * @property int $updates
  * @property ?Carbon $last_update_check
@@ -89,6 +89,7 @@ class Server extends AbstractModel
         'progress_step',
         'updates',
         'last_update_check',
+        'feature_data',
     ];
 
     protected $casts = [
@@ -101,6 +102,9 @@ class Server extends AbstractModel
         'progress' => 'float',
         'updates' => 'integer',
         'last_update_check' => 'datetime',
+        'feature_data' => 'json',
+        'os' => OperatingSystem::class,
+        'status' => ServerStatus::class,
     ];
 
     protected $hidden = [
@@ -148,17 +152,6 @@ class Server extends AbstractModel
             }
         });
     }
-
-    /**
-     * @var array<string, string>
-     */
-    public static array $statusColors = [
-        ServerStatus::READY => 'success',
-        ServerStatus::INSTALLING => 'warning',
-        ServerStatus::DISCONNECTED => 'gray',
-        ServerStatus::INSTALLATION_FAILED => 'danger',
-        ServerStatus::UPDATING => 'warning',
-    ];
 
     public function isReady(): bool
     {
@@ -293,16 +286,8 @@ class Server extends AbstractModel
     public function sshKeys(): BelongsToMany
     {
         return $this->belongsToMany(SshKey::class, 'server_ssh_keys')
-            ->withPivot('status')
+            ->withPivot('status', 'user')
             ->withTimestamps();
-    }
-
-    /**
-     * @return MorphToMany<Tag, covariant $this>
-     */
-    public function tags(): MorphToMany
-    {
-        return $this->morphToMany(Tag::class, 'taggable');
     }
 
     public function getSshUser(): string
@@ -543,12 +528,32 @@ class Server extends AbstractModel
         );
     }
 
-    public function getStatusColor(): string
+    /**
+     * @return array<string, mixed>
+     */
+    public function features(): array
     {
-        if (isset(self::$statusColors[$this->status])) {
-            return self::$statusColors[$this->status];
+        $features = config('server.features', []);
+        foreach ($features as $featureKey => $feature) {
+            foreach ($feature['actions'] ?? [] as $actionKey => $action) {
+                $handlerClass = $action['handler'] ?? null;
+                if ($handlerClass && class_exists($handlerClass)) {
+                    /** @var ActionInterface $handler */
+                    $handler = new $handlerClass($this);
+                    $action['active'] = $handler->active();
+                    if (! isset($action['form']) || empty($action['form'])) {
+                        $action['form'] = $handler->form()?->toArray() ?? [];
+                    }
+                }
+                $features[$featureKey]['actions'][$actionKey] = $action;
+            }
         }
 
-        return 'gray';
+        return $features;
+    }
+
+    public function hasFeature(string $feature): bool
+    {
+        return in_array($feature, config('server.features', []));
     }
 }

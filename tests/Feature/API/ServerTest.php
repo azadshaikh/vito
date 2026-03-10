@@ -44,7 +44,7 @@ class ServerTest extends TestCase
     {
         Sanctum::actingAs($this->user, ['read', 'write']);
 
-        SSH::fake('Active: active'); // fake output for service installations
+        SSH::fake('user_not_found'); // fake output for vito user check and service installations
 
         $this->json('POST', route('api.projects.servers.create', [
             'project' => $this->user->current_project_id,
@@ -53,7 +53,7 @@ class ServerTest extends TestCase
             'name' => 'test',
             'ip' => '1.1.1.1',
             'port' => '22',
-            'os' => OperatingSystem::UBUNTU22,
+            'os' => OperatingSystem::UBUNTU22->value,
             'services' => [],
         ])
             ->assertSuccessful()

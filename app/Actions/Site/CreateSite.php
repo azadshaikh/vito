@@ -6,11 +6,9 @@ use App\Enums\SiteStatus;
 use App\Exceptions\RepositoryNotFound;
 use App\Exceptions\RepositoryPermissionDenied;
 use App\Exceptions\SourceControlIsNotConnected;
-use App\Facades\Notifier;
+use App\Jobs\Site\CreateJob;
 use App\Models\Server;
 use App\Models\Site;
-use App\Notifications\SiteInstallationFailed;
-use App\Notifications\SiteInstallationSucceed;
 use App\ValidationRules\DomainRule;
 use Exception;
 use Illuminate\Support\Facades\DB;
@@ -28,11 +26,11 @@ class CreateSite
      */
     public function create(Server $server, array $input): Site
     {
-        Validator::make($input, self::rules($server, $input))->validate();
+        $this->validate($server, $input);
 
         DB::beginTransaction();
         try {
-            $user = $input['user'] ?? $server->getSshUser();
+            $user = $input['user'];
             $site = new Site([
                 'server_id' => $server->id,
                 'type' => $input['type'],
@@ -83,18 +81,7 @@ class CreateSite
             $site->commands()->createMany($site->type()->baseCommands());
 
             // install site
-            dispatch(function () use ($site): void {
-                $site->type()->install();
-                $site->update([
-                    'status' => SiteStatus::READY,
-                    'progress' => 100,
-                ]);
-                Notifier::send($site, new SiteInstallationSucceed($site));
-            })->catch(function () use ($site): void {
-                $site->status = SiteStatus::INSTALLATION_FAILED;
-                $site->save();
-                Notifier::send($site, new SiteInstallationFailed($site));
-            })->onQueue('ssh-unique');
+            dispatch(new CreateJob($site))->onQueue('ssh');
 
             DB::commit();
 
@@ -107,11 +94,7 @@ class CreateSite
         }
     }
 
-    /**
-     * @param  array<string, mixed>  $input
-     * @return array<string, mixed>
-     */
-    public static function rules(Server $server, array $input): array
+    private function validate(Server $server, array $input): void
     {
         $rules = [
             'type' => [
@@ -127,7 +110,7 @@ class CreateSite
                 new DomainRule,
             ],
             'user' => [
-                'nullable',
+                'required',
                 'regex:/^[a-z_][a-z0-9_-]*[a-z0-9]$/',
                 'min:3',
                 'max:32',
@@ -136,14 +119,14 @@ class CreateSite
             ],
         ];
 
-        return array_merge($rules, self::typeRules($server, $input));
+        Validator::make($input, array_merge($rules, $this->typeRules($server, $input)))->validate();
     }
 
     /**
      * @param  array<string, mixed>  $input
      * @return array<string, array<string>>
      */
-    private static function typeRules(Server $server, array $input): array
+    private function typeRules(Server $server, array $input): array
     {
         if (! isset($input['type']) || ! config('site.types.'.$input['type'])) {
             return [];
